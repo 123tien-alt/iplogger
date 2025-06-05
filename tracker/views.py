@@ -1,36 +1,22 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 import datetime
-import requests
+from .ip_lookup import get_ip_info  # 👈 Thêm dòng này
 
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
-        ip_list = x_forwarded_for.split(',')
-        for ip in ip_list:
-            if ip.strip() != '127.0.0.1':
-                return ip.strip()
-    return request.META.get('REMOTE_ADDR')
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
 
 def log_ip(request):
     ip = get_client_ip(request)
-    location_info = "Không xác định"
+    location_info = get_ip_info(ip)  # 👈 Gọi hàm mới
 
-    try:
-        # Gọi API ipapi.co lấy thông tin IP
-        response = requests.get(f"https://ipapi.co/{ip}/json/")
-        data = response.json()
-        if 'error' not in data:
-            location_info = f"{data.get('ip', ip)} - {data.get('country_name', '')} ({data.get('city', '')})"
-        else:
-            location_info = f"{ip} - Lỗi khi lấy thông tin: {data.get('reason')}"
-    except Exception as e:
-        location_info = f"{ip} - Lỗi khi gọi API: {e}"
-
-    # Ghi log chi tiết
-    log_line = f"{datetime.datetime.now()} - {location_info}\n"
     with open("log_ip.txt", "a") as f:
-        f.write(log_line)
+        f.write(f"{datetime.datetime.now()} - {location_info}\n")
 
     return render(request, 'tracker/index.html')
 
